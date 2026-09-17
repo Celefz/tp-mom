@@ -7,6 +7,8 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+const EXCHANGE_TYPE = "topic"
+
 func CreateQueueMiddleware(queueName string, connectionSettings m.ConnSettings) (m.Middleware, error) {
 	url := fmt.Sprintf("amqp://guest:guest@%s:%d/", connectionSettings.Hostname, connectionSettings.Port)
 
@@ -58,7 +60,7 @@ func CreateExchangeMiddleware(exchange string, keys []string, connectionSettings
 
 	err = channel.ExchangeDeclare(
 		exchange,
-		amqp.ExchangeDirect,
+		EXCHANGE_TYPE,
 		true,
 		false,
 		false,
