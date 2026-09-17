@@ -6,69 +6,33 @@ import (
 )
 
 type QueueMiddleware struct {
-	connection  *amqp.Connection
-	channel     *amqp.Channel
-	queue       amqp.Queue
-	consumerTag string
+	common    *CommonMiddlewareInfo
+	queueName string
 }
 
-func NewQueueMiddleware(conn *amqp.Connection, channel *amqp.Channel, queue amqp.Queue) *QueueMiddleware {
-	consumerTag := queue.Name + CONSUMER_TAG_SUFFIX
-
+func NewQueueMiddleware(conn *amqp.Connection, channel *amqp.Channel, queueName string) *QueueMiddleware {
 	return &QueueMiddleware{
-		conn,
-		channel,
-		queue,
-		consumerTag,
+		common:    NewCommonMiddlewareInfo(conn, channel, queueName),
+		queueName: queueName,
 	}
 }
 
 func (q *QueueMiddleware) StartConsuming(callbackFunc func(msg m.Message, ack func(), nack func())) error {
-	if q.channel.IsClosed() || q.connection.IsClosed() {
-		return m.ErrMessageMiddlewareDisconnected
-	}
-
-	messages, err := q.channel.Consume(
-		q.queue.Name,
-		q.consumerTag,
-		false,
-		false,
-		false,
-		false,
-		nil,
-	)
-
-	if err != nil {
-		return m.ErrMessageMiddlewareMessage
-	}
-
-	go func() {
-		for message := range messages {
-			callbackFunc(
-				m.Message{Body: string(message.Body)},
-				func() { message.Ack(false) },
-				func() { message.Nack(false, true) },
-			)
-		}
-	}()
-	return nil
+	return q.common.StartConsuming(q.queueName, callbackFunc)
 }
 
 func (q *QueueMiddleware) StopConsuming() error {
-	if err := q.channel.Cancel(q.consumerTag, false); err != nil {
-		return m.ErrMessageMiddlewareDisconnected
-	}
-	return nil
+	return q.common.StopConsuming()
 }
 
 func (q *QueueMiddleware) Send(msg m.Message) error {
-	if q.channel.IsClosed() || q.connection.IsClosed() {
-		return m.ErrMessageMiddlewareDisconnected
+	if err := q.common.ValidateConnection(); err != nil {
+		return err
 	}
 
-	err := q.channel.Publish(
+	err := q.common.channel.Publish(
 		"",
-		q.queue.Name,
+		q.queueName,
 		false,
 		false,
 		amqp.Publishing{
@@ -84,12 +48,5 @@ func (q *QueueMiddleware) Send(msg m.Message) error {
 }
 
 func (q *QueueMiddleware) Close() error {
-	channelErr := q.channel.Close()
-	connectionErr := q.connection.Close()
-
-	if channelErr != nil || connectionErr != nil {
-		return m.ErrMessageMiddlewareClose
-	}
-
-	return nil
+	return q.common.Close()
 }
