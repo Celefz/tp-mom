@@ -14,6 +14,10 @@ type QueueMiddleware struct {
 }
 
 func (q *QueueMiddleware) StartConsuming(callbackFunc func(msg m.Message, ack func(), nack func())) error {
+	if q.Channel.IsClosed() || q.Connection.IsClosed() {
+		return m.ErrMessageMiddlewareDisconnected
+	}
+
 	messages, err := q.Channel.Consume(
 		q.Queue.Name,
 		CONSUMER_TAG,
@@ -25,7 +29,7 @@ func (q *QueueMiddleware) StartConsuming(callbackFunc func(msg m.Message, ack fu
 	)
 
 	if err != nil {
-		return err
+		return m.ErrMessageMiddlewareMessage
 	}
 
 	go func() {
@@ -42,12 +46,16 @@ func (q *QueueMiddleware) StartConsuming(callbackFunc func(msg m.Message, ack fu
 
 func (q *QueueMiddleware) StopConsuming() error {
 	if err := q.Channel.Cancel(CONSUMER_TAG, false); err != nil {
-		return err
+		return m.ErrMessageMiddlewareDisconnected
 	}
 	return nil
 }
 
 func (q *QueueMiddleware) Send(msg m.Message) error {
+	if q.Channel.IsClosed() || q.Connection.IsClosed() {
+		return m.ErrMessageMiddlewareDisconnected
+	}
+
 	err := q.Channel.Publish(
 		"",
 		q.Queue.Name,
@@ -60,21 +68,18 @@ func (q *QueueMiddleware) Send(msg m.Message) error {
 	)
 
 	if err != nil {
-		return err
+		return m.ErrMessageMiddlewareMessage
 	}
 	return nil
 }
 
 func (q *QueueMiddleware) Close() error {
-	var finalErr error
+	channelErr := q.Channel.Close()
+	connectionErr := q.Connection.Close()
 
-	if err := q.Channel.Close(); err != nil && err != amqp.ErrClosed {
-		finalErr = err
+	if channelErr != nil || connectionErr != nil {
+		return m.ErrMessageMiddlewareClose
 	}
 
-	if err := q.Connection.Close(); err != nil && err != amqp.ErrClosed {
-		finalErr = err
-	}
-
-	return finalErr
+	return nil
 }
