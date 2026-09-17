@@ -42,5 +42,36 @@ func CreateQueueMiddleware(queueName string, connectionSettings m.ConnSettings) 
 }
 
 func CreateExchangeMiddleware(exchange string, keys []string, connectionSettings m.ConnSettings) (m.Middleware, error) {
-	return nil, nil
+	url := fmt.Sprintf("amqp://guest:guest@%s:%d/", connectionSettings.Hostname, connectionSettings.Port)
+
+	conn, err := amqp.Dial(url)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	channel, err := conn.Channel()
+	if err != nil {
+		return nil, err
+	}
+	defer channel.Close()
+
+	err = channel.ExchangeDeclare(
+		exchange,
+		amqp.ExchangeDirect,
+		false,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &m.ExchangeMiddleware{
+		Connection: conn,
+		Channel:    channel,
+		Exchange:   exchange,
+	}, nil
 }
