@@ -27,13 +27,15 @@ func (q *QueueMiddleware) StartConsuming(callbackFunc func(msg Message, ack func
 		return err
 	}
 
-	for message := range messages {
-		callbackFunc(
-			Message{string(message.Body)},
-			func() { message.Ack(false) },
-			func() { message.Nack(false, true) },
-		)
-	}
+	go func() {
+		for message := range messages {
+			callbackFunc(
+				Message{string(message.Body)},
+				func() { message.Ack(false) },
+				func() { message.Nack(false, true) },
+			)
+		}
+	}()
 	return nil
 }
 
