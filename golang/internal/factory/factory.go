@@ -14,13 +14,12 @@ func CreateQueueMiddleware(queueName string, connectionSettings m.ConnSettings) 
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
 
 	channel, err := conn.Channel()
 	if err != nil {
+		conn.Close()
 		return nil, err
 	}
-	defer channel.Close()
 
 	queue, err := channel.QueueDeclare(
 		queueName,
@@ -31,6 +30,8 @@ func CreateQueueMiddleware(queueName string, connectionSettings m.ConnSettings) 
 		nil,
 	)
 	if err != nil {
+		conn.Close()
+		channel.Close()
 		return nil, err
 	}
 
@@ -48,13 +49,12 @@ func CreateExchangeMiddleware(exchange string, keys []string, connectionSettings
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
 
 	channel, err := conn.Channel()
 	if err != nil {
+		conn.Close()
 		return nil, err
 	}
-	defer channel.Close()
 
 	err = channel.ExchangeDeclare(
 		exchange,
@@ -66,12 +66,45 @@ func CreateExchangeMiddleware(exchange string, keys []string, connectionSettings
 		nil,
 	)
 	if err != nil {
+		conn.Close()
+		channel.Close()
 		return nil, err
+	}
+
+	queue, err := channel.QueueDeclare(
+		"",
+		false,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		conn.Close()
+		channel.Close()
+		return nil, err
+	}
+
+	for _, key := range keys {
+		err = channel.QueueBind(
+			queue.Name,
+			key,
+			exchange,
+			false,
+			nil,
+		)
+		if err != nil {
+			conn.Close()
+			channel.Close()
+			return nil, err
+		}
 	}
 
 	return &m.ExchangeMiddleware{
 		Connection: conn,
 		Channel:    channel,
 		Exchange:   exchange,
+		Queue:      queue,
+		Keys:       keys,
 	}, nil
 }
