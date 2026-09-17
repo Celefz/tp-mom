@@ -23,7 +23,7 @@ func CreateQueueMiddleware(queueName string, connectionSettings m.ConnSettings) 
 
 	queue, err := channel.QueueDeclare(
 		queueName,
-		false,
+		true,
 		false,
 		false,
 		false,
@@ -59,7 +59,7 @@ func CreateExchangeMiddleware(exchange string, keys []string, connectionSettings
 	err = channel.ExchangeDeclare(
 		exchange,
 		amqp.ExchangeDirect,
-		false,
+		true,
 		false,
 		false,
 		false,
@@ -74,8 +74,8 @@ func CreateExchangeMiddleware(exchange string, keys []string, connectionSettings
 	queue, err := channel.QueueDeclare(
 		"",
 		false,
-		false,
-		false,
+		true,
+		true,
 		false,
 		nil,
 	)
