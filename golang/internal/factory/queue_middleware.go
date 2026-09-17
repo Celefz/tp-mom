@@ -1,6 +1,7 @@
-package middleware
+package factory
 
 import (
+	m "github.com/7574-sistemas-distribuidos/tp-mom/golang/internal/middleware"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -12,7 +13,7 @@ type QueueMiddleware struct {
 	Queue      amqp.Queue
 }
 
-func (q *QueueMiddleware) StartConsuming(callbackFunc func(msg Message, ack func(), nack func())) error {
+func (q *QueueMiddleware) StartConsuming(callbackFunc func(msg m.Message, ack func(), nack func())) error {
 	messages, err := q.Channel.Consume(
 		q.Queue.Name,
 		CONSUMER_TAG,
@@ -30,7 +31,7 @@ func (q *QueueMiddleware) StartConsuming(callbackFunc func(msg Message, ack func
 	go func() {
 		for message := range messages {
 			callbackFunc(
-				Message{string(message.Body)},
+				m.Message{Body: string(message.Body)},
 				func() { message.Ack(false) },
 				func() { message.Nack(false, true) },
 			)
@@ -46,7 +47,7 @@ func (q *QueueMiddleware) StopConsuming() error {
 	return nil
 }
 
-func (q *QueueMiddleware) Send(msg Message) error {
+func (q *QueueMiddleware) Send(msg m.Message) error {
 	err := q.Channel.Publish(
 		"",
 		q.Queue.Name,

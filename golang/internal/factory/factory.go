@@ -35,7 +35,7 @@ func CreateQueueMiddleware(queueName string, connectionSettings m.ConnSettings) 
 		return nil, err
 	}
 
-	return &m.QueueMiddleware{
+	return &QueueMiddleware{
 		Connection: conn,
 		Channel:    channel,
 		Queue:      queue,
@@ -100,7 +100,7 @@ func CreateExchangeMiddleware(exchange string, keys []string, connectionSettings
 		}
 	}
 
-	return &m.ExchangeMiddleware{
+	return &ExchangeMiddleware{
 		Connection: conn,
 		Channel:    channel,
 		Exchange:   exchange,

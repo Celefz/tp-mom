@@ -1,6 +1,7 @@
-package middleware
+package factory
 
 import (
+	m "github.com/7574-sistemas-distribuidos/tp-mom/golang/internal/middleware"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -14,7 +15,7 @@ type ExchangeMiddleware struct {
 	Keys       []string
 }
 
-func (e *ExchangeMiddleware) StartConsuming(callbackFunc func(msg Message, ack func(), nack func())) error {
+func (e *ExchangeMiddleware) StartConsuming(callbackFunc func(msg m.Message, ack func(), nack func())) error {
 	messages, err := e.Channel.Consume(
 		e.Queue.Name,
 		EXCHANGE_CONSUMER_TAG,
@@ -32,7 +33,7 @@ func (e *ExchangeMiddleware) StartConsuming(callbackFunc func(msg Message, ack f
 	go func() {
 		for message := range messages {
 			callbackFunc(
-				Message{string(message.Body)},
+				m.Message{Body: string(message.Body)},
 				func() { message.Ack(false) },
 				func() { message.Nack(false, true) },
 			)
@@ -48,7 +49,7 @@ func (e *ExchangeMiddleware) StopConsuming() error {
 	return nil
 }
 
-func (e *ExchangeMiddleware) Send(msg Message) error {
+func (e *ExchangeMiddleware) Send(msg m.Message) error {
 	for _, key := range e.Keys {
 		err := e.Channel.Publish(
 			e.Exchange,
