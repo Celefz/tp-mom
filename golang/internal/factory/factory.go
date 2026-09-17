@@ -35,11 +35,11 @@ func CreateQueueMiddleware(queueName string, connectionSettings m.ConnSettings) 
 		return nil, err
 	}
 
-	return &QueueMiddleware{
-		Connection: conn,
-		Channel:    channel,
-		Queue:      queue,
-	}, nil
+	return NewQueueMiddleware(
+		conn,
+		channel,
+		queue,
+	), nil
 }
 
 func CreateExchangeMiddleware(exchange string, keys []string, connectionSettings m.ConnSettings) (m.Middleware, error) {
@@ -100,11 +100,11 @@ func CreateExchangeMiddleware(exchange string, keys []string, connectionSettings
 		}
 	}
 
-	return &ExchangeMiddleware{
-		Connection: conn,
-		Channel:    channel,
-		Exchange:   exchange,
-		Queue:      queue,
-		Keys:       keys,
-	}, nil
+	return NewExchangeMiddleware(
+		conn,
+		channel,
+		exchange,
+		queue,
+		keys,
+	), nil
 }

@@ -5,22 +5,32 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-const CONSUMER_TAG = "queue-consumer"
-
 type QueueMiddleware struct {
-	Connection *amqp.Connection
-	Channel    *amqp.Channel
-	Queue      amqp.Queue
+	connection  *amqp.Connection
+	channel     *amqp.Channel
+	queue       amqp.Queue
+	consumerTag string
+}
+
+func NewQueueMiddleware(conn *amqp.Connection, channel *amqp.Channel, queue amqp.Queue) *QueueMiddleware {
+	consumerTag := queue.Name + CONSUMER_TAG_SUFFIX
+
+	return &QueueMiddleware{
+		conn,
+		channel,
+		queue,
+		consumerTag,
+	}
 }
 
 func (q *QueueMiddleware) StartConsuming(callbackFunc func(msg m.Message, ack func(), nack func())) error {
-	if q.Channel.IsClosed() || q.Connection.IsClosed() {
+	if q.channel.IsClosed() || q.connection.IsClosed() {
 		return m.ErrMessageMiddlewareDisconnected
 	}
 
-	messages, err := q.Channel.Consume(
-		q.Queue.Name,
-		CONSUMER_TAG,
+	messages, err := q.channel.Consume(
+		q.queue.Name,
+		q.consumerTag,
 		false,
 		false,
 		false,
@@ -45,20 +55,20 @@ func (q *QueueMiddleware) StartConsuming(callbackFunc func(msg m.Message, ack fu
 }
 
 func (q *QueueMiddleware) StopConsuming() error {
-	if err := q.Channel.Cancel(CONSUMER_TAG, false); err != nil {
+	if err := q.channel.Cancel(q.consumerTag, false); err != nil {
 		return m.ErrMessageMiddlewareDisconnected
 	}
 	return nil
 }
 
 func (q *QueueMiddleware) Send(msg m.Message) error {
-	if q.Channel.IsClosed() || q.Connection.IsClosed() {
+	if q.channel.IsClosed() || q.connection.IsClosed() {
 		return m.ErrMessageMiddlewareDisconnected
 	}
 
-	err := q.Channel.Publish(
+	err := q.channel.Publish(
 		"",
-		q.Queue.Name,
+		q.queue.Name,
 		false,
 		false,
 		amqp.Publishing{
@@ -74,8 +84,8 @@ func (q *QueueMiddleware) Send(msg m.Message) error {
 }
 
 func (q *QueueMiddleware) Close() error {
-	channelErr := q.Channel.Close()
-	connectionErr := q.Connection.Close()
+	channelErr := q.channel.Close()
+	connectionErr := q.connection.Close()
 
 	if channelErr != nil || connectionErr != nil {
 		return m.ErrMessageMiddlewareClose

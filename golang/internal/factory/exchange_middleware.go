@@ -5,24 +5,44 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-const EXCHANGE_CONSUMER_TAG = "exchange_consumer"
+const CONSUMER_TAG_SUFFIX = "-consumer"
 
 type ExchangeMiddleware struct {
-	Connection *amqp.Connection
-	Channel    *amqp.Channel
-	Exchange   string
-	Queue      amqp.Queue
-	Keys       []string
+	connection  *amqp.Connection
+	channel     *amqp.Channel
+	exchange    string
+	queue       amqp.Queue
+	keys        []string
+	consumerTag string
+}
+
+func NewExchangeMiddleware(
+	conn *amqp.Connection,
+	channel *amqp.Channel,
+	exchangeName string,
+	queue amqp.Queue,
+	keys []string,
+) *ExchangeMiddleware {
+	consumerTag := queue.Name + CONSUMER_TAG_SUFFIX
+
+	return &ExchangeMiddleware{
+		conn,
+		channel,
+		exchangeName,
+		queue,
+		keys,
+		consumerTag,
+	}
 }
 
 func (e *ExchangeMiddleware) StartConsuming(callbackFunc func(msg m.Message, ack func(), nack func())) error {
-	if e.Channel.IsClosed() || e.Connection.IsClosed() {
+	if e.channel.IsClosed() || e.connection.IsClosed() {
 		return m.ErrMessageMiddlewareDisconnected
 	}
 
-	messages, err := e.Channel.Consume(
-		e.Queue.Name,
-		EXCHANGE_CONSUMER_TAG,
+	messages, err := e.channel.Consume(
+		e.queue.Name,
+		e.consumerTag,
 		false,
 		false,
 		false,
@@ -47,20 +67,20 @@ func (e *ExchangeMiddleware) StartConsuming(callbackFunc func(msg m.Message, ack
 }
 
 func (e *ExchangeMiddleware) StopConsuming() error {
-	if err := e.Channel.Cancel(EXCHANGE_CONSUMER_TAG, false); err != nil {
+	if err := e.channel.Cancel(e.consumerTag, false); err != nil {
 		return m.ErrMessageMiddlewareDisconnected
 	}
 	return nil
 }
 
 func (e *ExchangeMiddleware) Send(msg m.Message) error {
-	if e.Channel.IsClosed() || e.Connection.IsClosed() {
+	if e.channel.IsClosed() || e.connection.IsClosed() {
 		return m.ErrMessageMiddlewareDisconnected
 	}
 
-	for _, key := range e.Keys {
-		err := e.Channel.Publish(
-			e.Exchange,
+	for _, key := range e.keys {
+		err := e.channel.Publish(
+			e.exchange,
 			key,
 			false,
 			false,
@@ -77,8 +97,8 @@ func (e *ExchangeMiddleware) Send(msg m.Message) error {
 }
 
 func (e *ExchangeMiddleware) Close() error {
-	channelErr := e.Channel.Close()
-	connectionErr := e.Connection.Close()
+	channelErr := e.channel.Close()
+	connectionErr := e.connection.Close()
 
 	if channelErr != nil || connectionErr != nil {
 		return m.ErrMessageMiddlewareClose
